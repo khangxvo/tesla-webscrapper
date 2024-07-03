@@ -56,7 +56,8 @@ def main():
 
         # Parse listed jobs and pretty print it
         result = decoded_jobs(listings, departments, locations, types)
-        print(json.dumps(result, indent=4))
+        # print(json.dumps(result, indent=4))
+        return result
 
     else:
         print('Failed to get response from the API.')
