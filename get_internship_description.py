@@ -8,63 +8,70 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def main():
+    """
+    Main function to fetch internship job listings and their descriptions,
+    then print the results in a pretty JSON format.
+    """
     internship = getInternship()
-    # print(len(internship))
     result = getDescription(internship)
-    # print(json.dumps(result, indent=4))
+    print(json.dumps(result, indent=4))
 
 
 def getInternship():
-    result = getJobs()
-    intership = [job for job in result if job['type'] == 'intern']
+    """
+    Fetches job listings and filters them to return only internships.
 
-    return intership
+    Returns:
+        list: A list of internship job dictionaries.
+    """
+    result = getJobs()
+    internship = [job for job in result if job['type'] == 'intern']
+    return internship
 
 
 def getDescription(internship):
-    # index = 10
+    """
+    Fetches detailed descriptions for each internship job concurrently.
+
+    Args:
+        internship (list): A list of internship job dictionaries.
+
+    Returns:
+        list: A list of internship job dictionaries with detailed descriptions.
+    """
     result = []
-
-    # description = getRequest(internship[index])
-    # description = parseHTML(description)
-    # internship[index]['description'] = description
-    # print(json.dumps(internship[index], indent=4))
-
-    for job in internship:
-        description = getRequest(job)
-        description = parseHTML(description)
-        # Add description to job
-        job['description'] = description
-        result.append(job)
-
-    # for i in range(100):
-    #     description = getRequest(internship[i])
-    #     description = parseHTML(description)
-    #     internship[i]['description'] = description
-    #     result.append(internship[i])
-
+    # Create a ThreadPoolExecutor to manage concurrent threads.
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        # Submit tasks to the executor to fetch job descriptions concurrently.
+        future_to_job = {executor.submit(
+            getRequest, job): job for job in internship}
+        # Iterate over the completed futures as they finish.
+        for future in as_completed(future_to_job):
+            # Get the job associated with the completed future.
+            job = future_to_job[future]
+            # Retrieve the result (job description) from the future.
+            description = future.result()
+            if description:  # Check if the description is not None.
+                # Parse the HTML content to plain text.
+                description = parseHTML(description)
+                # Add the parsed description to the job dictionary.
+                job['description'] = description
+                # Append the updated job dictionary to the result list.
+                result.append(job)
+    # Return the list of job dictionaries with detailed descriptions.
     return result
 
 
 def parseHTML(description):
-    # # Parse HTML using BeautifulSoup with 'html.parser'
-    # soup = BeautifulSoup(description, 'html.parser')
+    """
+    Parses HTML content to plain text.
 
-    # # Use str() to convert the parsed soup object back to a string
-    # plain_text = str(soup)
+    Args:
+        description (str): HTML content as a string.
 
-    # # Convert HTML entities to corresponding characters
-    # plain_text = html.unescape(plain_text)
-
-    # # Strip any remaining HTML tags
-    # plain_text = BeautifulSoup(
-    #     plain_text, 'html.parser').get_text(separator=' ')
-
-    # # Replace non-breaking space and other special characters with regular spaces
-    # plain_text = unicodedata.normalize(
-    #     'NFKD', plain_text)  # Normalize Unicode characters
-    # return plain_text
-
+    Returns:
+        str: Plain text extracted from the HTML content.
+    """
     soup = BeautifulSoup(description, 'html.parser')
     plain_text = html.unescape(soup.get_text(separator=' '))
     plain_text = unicodedata.normalize('NFKD', plain_text)
@@ -72,36 +79,32 @@ def parseHTML(description):
 
 
 def getRequest(job):
+    """
+    Makes a GET request to fetch the job description for a given job.
+
+    Args:
+        job (dict): A dictionary containing job details, including the job ID.
+
+    Returns:
+        str or None: The job description if the request is successful, otherwise None.
+    """
     uri = 'https://www.tesla.com/cua-api/careers/job/' + job['id']
     headers = {
-        # Identifies the client software initiating the request
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS 10.15; rv:124.0)',
-        # Specifies the media types that are acceptable for the response
         'Accept': "application/json, tex/plain, */*",
-        # Indicates the preferred languages for the response
         'Accept-Language': 'en-US,en;q=0.5',
-        # Instructs the server to maintain the connection for multiple requests
         'Connection': 'keep-alive',
-        # Provides the URL of the referring page
         'Referer': 'https://www.tesla.com/careers/search',
-        # Indicates the destination of the fetch request (e.g., document, image)
         'Sec-Fetch-Dest': 'empty',
-        # Specifies the mode of the fetch request (e.g., cors, no-cors)
         'Sec-Fetch-Mode': 'cors',
-        # Indicates the relationship between the origin of the request initiator and the request destination
         "Sec-Fetch-Site": 'same-origin'
     }
 
     res = requests.get(uri, headers=headers, timeout=2)
 
     if res.status_code == 200:
-
-        # Decodes the response content from bytes to a UTF-8 string
         res_str = res.content.decode('utf-8')
-
-        # Parses the decoded string into a JSON object
         json_data = json.loads(res_str)
-
         return json_data['jobDescription']
     else:
         print(
