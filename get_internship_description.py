@@ -14,7 +14,12 @@ def main():
     """
     internship = getInternship()
     result = getDescription(internship)
-    print(json.dumps(result, indent=4))
+    json_data = json.dumps(result, indent=4)
+
+    file_path = 'interns_w_descriptions.json'
+
+    with open(file_path, 'w') as file:
+        file.write(json_data)
 
 
 def getInternship():
